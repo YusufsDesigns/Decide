@@ -98,5 +98,5 @@ We welcome contributions! Follow these steps:
 MIT License. See `LICENSE` file for details.
 
 ## Contact
-For inquiries, open an issue or reach out via [your contact details].
+For inquiries, open an issue or reach out via X @dev_lawal.
 
