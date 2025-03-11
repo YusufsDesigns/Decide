@@ -22,10 +22,10 @@ export default function Home() {
   useEffect(() => {
     if (authState?.idToken) {
       const decodedToken = jwtDecode<DecodedToken>(authState?.idToken);
-      
+
       setUsername(decodedToken.edu_username);
     }
-  }, [authState?.idToken]);  
+  }, [authState?.idToken]);
 
   if (authState?.error) {
     toast.error("Could not login", {
@@ -51,12 +51,10 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[90vh] gap-7 max-w-[600px] mx-auto px-2 text-center">
-      <h1 className="text-6xl">Welcome to Decide</h1>
+    <div className="flex flex-col items-start sm:items-center justify-center min-h-[90vh] gap-7 max-w-[600px] mx-auto px-5 text-left sm:text-center">
+      <h2 className="text-2xl sm:text-4xl font-semibold">Compete, Propose, Vote, and Earn!</h2>
       <p className="">
-        Compete, Vote, Win! Enter exciting contests, showcase your ideas, and
-        win rewards. Join a community where creativity meets competition—your
-        next victory starts here!
+      Enter contests, propose solutions, and get rewarded for driving change in education. DECIDE empowers students, educators, and innovators to create and vote on ideas that shape the future of learning while crowdsourcing funding for impactful solutions. Your impact starts here!
       </p>
       {authState?.isAuthenticated ? (
         <div>
