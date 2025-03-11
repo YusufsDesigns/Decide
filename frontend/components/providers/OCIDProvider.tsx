@@ -8,7 +8,7 @@ interface OCIDProviderProps {
 }
 
 const opts = {
-  redirectUri: "http://localhost:3000/redirect",
+  redirectUri: "https://decide-dapp.vercel.app/redirect",
   referralCode: "PARTNER6",
 };
 
