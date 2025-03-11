@@ -48,7 +48,7 @@ Ensure you have the following installed:
 
 ### Running the Development Server
 ```sh
- pnpm dev
+ npm dev
 ```
 This starts the app on `http://localhost:3000`.
 
