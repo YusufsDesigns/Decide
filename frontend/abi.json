@@ -1,0 +1,480 @@
+[
+  { "type": "constructor", "inputs": [], "stateMutability": "nonpayable" },
+  {
+    "type": "function",
+    "name": "changeContestStateByTime",
+    "inputs": [
+      { "name": "_contestId", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "changeContestStateManually",
+    "inputs": [
+      { "name": "_contestId", "type": "uint256", "internalType": "uint256" },
+      { "name": "stateType", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "checkUpkeep",
+    "inputs": [],
+    "outputs": [
+      { "name": "upkeepNeeded", "type": "bool", "internalType": "bool" },
+      { "name": "performData", "type": "bytes", "internalType": "bytes" }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "createContest",
+    "inputs": [
+      { "name": "_name", "type": "string", "internalType": "string" },
+      { "name": "_creator", "type": "string", "internalType": "string" },
+      { "name": "_description", "type": "string", "internalType": "string" },
+      { "name": "_entryFee", "type": "uint256", "internalType": "uint256" },
+      { "name": "_entryTime", "type": "uint256", "internalType": "uint256" },
+      { "name": "_voteTime", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "determineWinners",
+    "inputs": [
+      { "name": "_contestId", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getAllEntries",
+    "inputs": [
+      { "name": "_contestId", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple[]",
+        "internalType": "struct Decide.Entry[]",
+        "components": [
+          { "name": "id", "type": "uint256", "internalType": "uint256" },
+          { "name": "name", "type": "string", "internalType": "string" },
+          { "name": "proposer", "type": "string", "internalType": "string" },
+          {
+            "name": "owner",
+            "type": "address",
+            "internalType": "address payable"
+          },
+          { "name": "votes", "type": "uint256", "internalType": "uint256" },
+          {
+            "name": "metadataURI",
+            "type": "string",
+            "internalType": "string"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getContest",
+    "inputs": [
+      { "name": "_contestId", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct Decide.Contest",
+        "components": [
+          { "name": "id", "type": "uint256", "internalType": "uint256" },
+          { "name": "name", "type": "string", "internalType": "string" },
+          { "name": "creator", "type": "string", "internalType": "string" },
+          {
+            "name": "description",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "entryFee",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "entryTimeDeadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "voteTimeDeadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "winners",
+            "type": "tuple[]",
+            "internalType": "struct Decide.Entry[]",
+            "components": [
+              { "name": "id", "type": "uint256", "internalType": "uint256" },
+              { "name": "name", "type": "string", "internalType": "string" },
+              {
+                "name": "proposer",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "owner",
+                "type": "address",
+                "internalType": "address payable"
+              },
+              {
+                "name": "votes",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "metadataURI",
+                "type": "string",
+                "internalType": "string"
+              }
+            ]
+          },
+          {
+            "name": "entryIds",
+            "type": "uint256[]",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "contestState",
+            "type": "uint8",
+            "internalType": "enum Decide.ContestState"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getContestsBatch",
+    "inputs": [
+      { "name": "_start", "type": "uint256", "internalType": "uint256" },
+      { "name": "_count", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple[]",
+        "internalType": "struct Decide.Contest[]",
+        "components": [
+          { "name": "id", "type": "uint256", "internalType": "uint256" },
+          { "name": "name", "type": "string", "internalType": "string" },
+          { "name": "creator", "type": "string", "internalType": "string" },
+          {
+            "name": "description",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "entryFee",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "entryTimeDeadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "voteTimeDeadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "winners",
+            "type": "tuple[]",
+            "internalType": "struct Decide.Entry[]",
+            "components": [
+              { "name": "id", "type": "uint256", "internalType": "uint256" },
+              { "name": "name", "type": "string", "internalType": "string" },
+              {
+                "name": "proposer",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "owner",
+                "type": "address",
+                "internalType": "address payable"
+              },
+              {
+                "name": "votes",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "metadataURI",
+                "type": "string",
+                "internalType": "string"
+              }
+            ]
+          },
+          {
+            "name": "entryIds",
+            "type": "uint256[]",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "contestState",
+            "type": "uint8",
+            "internalType": "enum Decide.ContestState"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getEntry",
+    "inputs": [
+      { "name": "_contestId", "type": "uint256", "internalType": "uint256" },
+      { "name": "_entryId", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct Decide.Entry",
+        "components": [
+          { "name": "id", "type": "uint256", "internalType": "uint256" },
+          { "name": "name", "type": "string", "internalType": "string" },
+          { "name": "proposer", "type": "string", "internalType": "string" },
+          {
+            "name": "owner",
+            "type": "address",
+            "internalType": "address payable"
+          },
+          { "name": "votes", "type": "uint256", "internalType": "uint256" },
+          {
+            "name": "metadataURI",
+            "type": "string",
+            "internalType": "string"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getEntryLength",
+    "inputs": [
+      { "name": "_contestId", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getHasUserJoinedContest",
+    "inputs": [
+      { "name": "_contestId", "type": "uint256", "internalType": "uint256" },
+      { "name": "_user", "type": "address", "internalType": "address" }
+    ],
+    "outputs": [{ "name": "", "type": "bool", "internalType": "bool" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getHasUserVoted",
+    "inputs": [
+      { "name": "_contestId", "type": "uint256", "internalType": "uint256" },
+      { "name": "voter", "type": "string", "internalType": "string" }
+    ],
+    "outputs": [{ "name": "", "type": "bool", "internalType": "bool" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "joinContest",
+    "inputs": [
+      { "name": "_contestId", "type": "uint256", "internalType": "uint256" },
+      { "name": "_name", "type": "string", "internalType": "string" },
+      { "name": "_proposer", "type": "string", "internalType": "string" },
+      { "name": "_metadataURI", "type": "string", "internalType": "string" }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "performUpkeep",
+    "inputs": [
+      { "name": "performData", "type": "bytes", "internalType": "bytes" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "s_contestExists",
+    "inputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "outputs": [{ "name": "", "type": "bool", "internalType": "bool" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "voteForEntry",
+    "inputs": [
+      { "name": "_contestId", "type": "uint256", "internalType": "uint256" },
+      { "name": "_entryId", "type": "uint256", "internalType": "uint256" },
+      { "name": "voter", "type": "string", "internalType": "string" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "ContestCreated",
+    "inputs": [
+      {
+        "name": "name",
+        "type": "string",
+        "indexed": true,
+        "internalType": "string"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ContestJoined",
+    "inputs": [
+      {
+        "name": "contestId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "indexed": true,
+        "internalType": "string"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ContestStateUpdated",
+    "inputs": [
+      {
+        "name": "contestId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "state",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "enum Decide.ContestState"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PrizeDistributed",
+    "inputs": [
+      {
+        "name": "contestId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "winner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "prize",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "place",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "WinnersSelected",
+    "inputs": [
+      {
+        "name": "contestId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "winners",
+        "type": "tuple[]",
+        "indexed": false,
+        "internalType": "struct Decide.Entry[]",
+        "components": [
+          { "name": "id", "type": "uint256", "internalType": "uint256" },
+          { "name": "name", "type": "string", "internalType": "string" },
+          { "name": "proposer", "type": "string", "internalType": "string" },
+          {
+            "name": "owner",
+            "type": "address",
+            "internalType": "address payable"
+          },
+          { "name": "votes", "type": "uint256", "internalType": "uint256" },
+          {
+            "name": "metadataURI",
+            "type": "string",
+            "internalType": "string"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  { "type": "error", "name": "Decide_UserHasJoinedContest", "inputs": [] },
+  { "type": "error", "name": "Decide_UserHasVotedAlready", "inputs": [] },
+  { "type": "error", "name": "Decide__ContestNotOpen", "inputs": [] },
+  { "type": "error", "name": "Decide__ContestNotYetEnded", "inputs": [] },
+  { "type": "error", "name": "Decide__EntryTimePassed", "inputs": [] },
+  { "type": "error", "name": "Decide__IncorrectEntryFee", "inputs": [] },
+  { "type": "error", "name": "Decide__InvalidContestId", "inputs": [] },
+  { "type": "error", "name": "Decide__InvalidEntryId", "inputs": [] },
+  { "type": "error", "name": "Decide__NoEntries", "inputs": [] },
+  { "type": "error", "name": "Decide__NotInVotingPhase", "inputs": [] },
+  { "type": "error", "name": "Decide__TransferFailed", "inputs": [] },
+  { "type": "error", "name": "Decide__VotingClosed", "inputs": [] }
+]
