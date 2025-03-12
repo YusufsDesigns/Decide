@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { BrowserProvider, Signer } from "ethers";
 import { toast } from "react-toastify";
 
@@ -10,6 +10,7 @@ declare global {
   }
 }
 
+// Network configuration
 const EDU_CHAIN_ID = "0xA045C"; // Chain ID for Edu Chain
 const EDU_CHAIN_CONFIG = {
   chainId: EDU_CHAIN_ID,
@@ -23,6 +24,17 @@ const EDU_CHAIN_CONFIG = {
   blockExplorerUrls: ["https://opencampus-codex.blockscout.com/"],
 };
 
+// Toast configuration to avoid repetition
+const TOAST_CONFIG = {
+  position: "top-center",
+  autoClose: 5000,
+  hideProgressBar: false,
+  closeOnClick: true,
+  pauseOnHover: true,
+  draggable: true,
+  theme: "light",
+} as const;
+
 export const useWallet = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [signer, setSigner] = useState<Signer | null>(null);
@@ -31,135 +43,52 @@ export const useWallet = () => {
   const [provider, setProvider] = useState<BrowserProvider | null>(null);
 
   // Initialize provider
-  const getProvider = () => {
-    if (!window.ethereum) {
-      throw new Error("MetaMask not detected");
-    }
-    return new BrowserProvider(window.ethereum);
-  };
-
-  // Initialize provider on mount
   useEffect(() => {
+    if (!window.ethereum) {
+      setError("Please install MetaMask to connect");
+      return;
+    }
+    
     try {
-      const provider = getProvider();
-      setProvider(provider);
+      setProvider(new BrowserProvider(window.ethereum));
     } catch (err) {
-      toast.error("Failed to initialize provider", {
-        position: "top-center",
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: false,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-        theme: "light",
-      });
+      toast.error("Failed to initialize provider", TOAST_CONFIG);
       setError("Please install MetaMask to connect");
     }
   }, []);
 
-  // Check if wallet was previously connected and restore connection
-  const checkConnection = async () => {
+  // Switch to Open Campus network
+  const switchToOpenCampusNetwork = useCallback(async () => {
+    if (!window.ethereum) return false;
+    
     try {
-      const storedAddress = localStorage.getItem("walletAddress");
-      if (!storedAddress || !provider) return;
-
-      // Check if we're still connected to this address
-      const accounts = await provider.listAccounts();
-      if (
-        accounts.length > 0 &&
-        accounts[0].address.toLowerCase() === storedAddress.toLowerCase()
-      ) {
-        const newSigner = await provider.getSigner();
-        const confirmedAddress = await newSigner.getAddress();
-        setSigner(newSigner);
-        setAddress(confirmedAddress);
-      } else {
-        // Clear stored data if we're no longer connected
-        localStorage.removeItem("walletAddress");
-      }
-    } catch (err) {
-      toast.error("Failed to restore connection", {
-        position: "top-center",
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: false,
-        pauseOnHover: true,
-        draggable: true,
-        progress: undefined,
-        theme: "light",
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: EDU_CHAIN_ID }],
       });
-      localStorage.removeItem("walletAddress");
-    }
-  };
-
-  // Initial connection check when provider is set
-  useEffect(() => {
-    if (provider) {
-      checkConnection();
-    }
-  }, [provider]);
-
-  // Ensure the user is connected to the Edu Chain network
-  const switchToOpenCampusNetwork = async () => {
-    if (typeof window.ethereum !== "undefined") {
-      try {
-        await window.ethereum.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: EDU_CHAIN_ID }],
-        });
-        console.log("Switched to Open Campus Codex network");
-        
-      } catch (switchError: any) {
-        if (switchError.code === 4902) {
-          try {
-            await window.ethereum.request({
-              method: "wallet_addEthereumChain",
-              params: [
-                {
-                  chainId: EDU_CHAIN_ID,
-                  chainName: "Open Campus Codex",
-                  nativeCurrency: {
-                    name: "EDU",
-                    symbol: "EDU",
-                    decimals: 18,
-                  },
-                  rpcUrls: ["https://rpc.open-campus-codex.gelato.digital"],
-                  blockExplorerUrls: [
-                    "https://opencampus-codex.blockscout.com/",
-                  ],
-                },
-              ],
-            });
-          } catch (addError) {
-            toast.error("Failed to add Open Campus Codex network", {
-              position: "top-center",
-              autoClose: 5000,
-              hideProgressBar: false,
-              closeOnClick: false,
-              pauseOnHover: true,
-              draggable: true,
-              progress: undefined,
-              theme: "light",
-            });
-          }
-        } else {
-          toast.error("Failed to switch to Open Campus Codex network", {
-            position: "top-center",
-            autoClose: 5000,
-            hideProgressBar: false,
-            closeOnClick: false,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-            theme: "light",
+      return true;
+    } catch (switchError: any) {
+      // Network doesn't exist in wallet
+      if (switchError.code === 4902) {
+        try {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [EDU_CHAIN_CONFIG],
           });
+          return true;
+        } catch (addError) {
+          toast.error("Failed to add Open Campus Codex network", TOAST_CONFIG);
+          return false;
         }
+      } else {
+        toast.error("Failed to switch to Open Campus Codex network", TOAST_CONFIG);
+        return false;
       }
     }
-  };
+  }, []);
 
-  const connectWallet = async (): Promise<void> => {
+  // Handle wallet connection
+  const connectWallet = useCallback(async (): Promise<void> => {
     setIsConnecting(true);
     setError(null);
 
@@ -168,138 +97,118 @@ export const useWallet = () => {
         throw new Error("Provider not initialized");
       }
 
-      // Ensure the user is connected to the Edu Chain network
-      await switchToOpenCampusNetwork();
-
-      // Request accounts and trigger MetaMask popup
-      const accounts = await provider.send("eth_requestAccounts", []);
-      if (!accounts || accounts.length === 0) {
-        throw new Error("No accounts returned from MetaMask");
+      // Ensure correct network
+      const networkSwitched = await switchToOpenCampusNetwork();
+      if (!networkSwitched) {
+        throw new Error("Network switch failed");
       }
 
+      // Request accounts
+      await provider.send("eth_requestAccounts", []);
       const newSigner = await provider.getSigner();
       const newAddress = await newSigner.getAddress();
 
-      // Store connection info
+      // Update state and storage
       localStorage.setItem("walletAddress", newAddress);
       setSigner(newSigner);
       setAddress(newAddress);
     } catch (err: any) {
-      if (err.code === 4001) {
-        setError("User rejected the connection request");
-        toast.error("User rejected the connection request", {
-          position: "top-center",
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: false,
-          pauseOnHover: true,
-          draggable: true,
-          progress: undefined,
-          theme: "light",
-        });
-      } else if (err.message.includes("MetaMask not detected")) {
-        setError("Please install MetaMask to connect");
-        toast.error("Please install MetaMask to connect", {
-          position: "top-center",
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: false,
-          pauseOnHover: true,
-          draggable: true,
-          progress: undefined,
-          theme: "light",
-        });
-      } else {
-        setError(err.message || "Failed to connect wallet");
-        toast.error("Failed to connect wallet", {
-          position: "top-center",
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: false,
-          pauseOnHover: true,
-          draggable: true,
-          progress: undefined,
-          theme: "light",
-        });
-      }
+      const errorMessage = 
+        err.code === 4001 
+          ? "User rejected the connection request" 
+          : err.message?.includes("MetaMask not detected")
+            ? "Please install MetaMask to connect"
+            : err.message || "Failed to connect wallet";
+      
+      setError(errorMessage);
+      toast.error(errorMessage, TOAST_CONFIG);
+      
       setSigner(null);
       setAddress(null);
       localStorage.removeItem("walletAddress");
     } finally {
       setIsConnecting(false);
     }
-  };
+  }, [provider, switchToOpenCampusNetwork]);
 
-  const disconnect = () => {
+  // Disconnect wallet
+  const disconnect = useCallback(() => {
     setSigner(null);
     setAddress(null);
     localStorage.removeItem("walletAddress");
-  };
+  }, []);
+
+  // Check if wallet was previously connected
+  const checkConnection = useCallback(async () => {
+    if (!provider) return;
+    
+    try {
+      const storedAddress = localStorage.getItem("walletAddress");
+      if (!storedAddress) return;
+
+      const accounts = await provider.listAccounts();
+      if (accounts.length > 0 && 
+          accounts[0].address.toLowerCase() === storedAddress.toLowerCase()) {
+        const newSigner = await provider.getSigner();
+        const confirmedAddress = await newSigner.getAddress();
+        setSigner(newSigner);
+        setAddress(confirmedAddress);
+      } else {
+        localStorage.removeItem("walletAddress");
+      }
+    } catch (err) {
+      toast.error("Failed to restore connection", TOAST_CONFIG);
+      localStorage.removeItem("walletAddress");
+    }
+  }, [provider]);
+
+  // Initial connection check
+  useEffect(() => {
+    if (provider) {
+      checkConnection();
+    }
+  }, [provider, checkConnection]);
 
   // Handle account and chain changes
   useEffect(() => {
-    if (window.ethereum) {
-      const handleAccountsChanged = async (accounts: string[]) => {
-        if (accounts.length === 0) {
-          // User disconnected their wallet
+    if (!window.ethereum) return;
+
+    const handleAccountsChanged = async (accounts: string[]) => {
+      if (accounts.length === 0) {
+        disconnect();
+      } else if (provider) {
+        try {
+          const newSigner = await provider.getSigner();
+          const newAddress = await newSigner.getAddress();
+          localStorage.setItem("walletAddress", newAddress);
+          setSigner(newSigner);
+          setAddress(newAddress);
+        } catch (err) {
+          toast.error("Failed to update signer", TOAST_CONFIG);
           disconnect();
-        } else {
-          // Account changed, update signer and address
-          try {
-            const newSigner = await provider!.getSigner();
-            const newAddress = await newSigner.getAddress();
-            localStorage.setItem("walletAddress", newAddress);
-            setSigner(newSigner);
-            setAddress(newAddress);
-          } catch (err) {
-            toast.error("Failed to update signer", {
-              position: "top-center",
-              autoClose: 5000,
-              hideProgressBar: false,
-              closeOnClick: false,
-              pauseOnHover: true,
-              draggable: true,
-              progress: undefined,
-              theme: "light",
-            });
-            disconnect();
-          }
         }
-      };
+      }
+    };
 
-      const handleChainChanged = async (chainId: string) => {
-        if (chainId !== EDU_CHAIN_ID) {
-          // If the user switches to a different chain, prompt them to switch back
-          try {
-            await switchToOpenCampusNetwork();
-          } catch (err) {
-            toast.error("Please connect to the Edu Chain network", {
-              position: "top-center",
-              autoClose: 5000,
-              hideProgressBar: false,
-              closeOnClick: false,
-              pauseOnHover: true,
-              draggable: true,
-              progress: undefined,
-              theme: "light",
-            });
-            setError("Please connect to the Edu Chain network");
-          }
+    const handleChainChanged = async () => {
+      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      if (chainId !== EDU_CHAIN_ID) {
+        const switched = await switchToOpenCampusNetwork();
+        if (!switched) {
+          toast.error("Please connect to the Edu Chain network", TOAST_CONFIG);
+          setError("Please connect to the Edu Chain network");
         }
-      };
+      }
+    };
 
-      window.ethereum.on("accountsChanged", handleAccountsChanged);
-      window.ethereum.on("chainChanged", handleChainChanged);
+    window.ethereum.on("accountsChanged", handleAccountsChanged);
+    window.ethereum.on("chainChanged", handleChainChanged);
 
-      return () => {
-        window.ethereum.removeListener(
-          "accountsChanged",
-          handleAccountsChanged
-        );
-        window.ethereum.removeListener("chainChanged", handleChainChanged);
-      };
-    }
-  }, [provider]);
+    return () => {
+      window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
+      window.ethereum.removeListener("chainChanged", handleChainChanged);
+    };
+  }, [provider, disconnect, switchToOpenCampusNetwork]);
 
   return {
     signer,

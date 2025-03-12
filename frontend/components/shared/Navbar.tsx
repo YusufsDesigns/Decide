@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 const Navbar = () => {
-  const { address, connectWallet } = useWallet();
+  const { address, connectWallet, disconnect } = useWallet();
   const [showDropdown, setShowDropdown] = useState<boolean>(false);
   const { username } = useUser();
 
@@ -15,8 +15,8 @@ const Navbar = () => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const disconnectWallet = (): void => {
-    // setAddress(null);
+  const handleDisconnectWallet = (): void => {
+    disconnect();
     setShowDropdown(false);
   };
 
@@ -43,6 +43,18 @@ const Navbar = () => {
               <span className="truncate">Connect Wallet</span>
             )}
           </button>
+          
+          {/* Dropdown menu */}
+          {showDropdown && address && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10">
+              <div 
+                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer rounded-md"
+                onClick={handleDisconnectWallet}
+              >
+                Disconnect Wallet
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>
