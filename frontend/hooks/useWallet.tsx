@@ -39,13 +39,19 @@ export const useWallet = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [signer, setSigner] = useState<Signer | null>(null);
   const [address, setAddress] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [provider, setProvider] = useState<BrowserProvider | null>(null);
 
-  // Initialize provider
+  // Initialize provider - ensure it's MetaMask
   useEffect(() => {
     if (!window.ethereum) {
-      setError("Please install MetaMask to connect");
+      toast.error("Please install MetaMask to connect", TOAST_CONFIG);
+      return;
+    }
+    
+    // Check if the provider is MetaMask
+    const isMetaMask = window.ethereum.isMetaMask;
+    if (!isMetaMask) {
+      toast.error("Please use MetaMask wallet to connect", TOAST_CONFIG);
       return;
     }
     
@@ -53,13 +59,15 @@ export const useWallet = () => {
       setProvider(new BrowserProvider(window.ethereum));
     } catch (err) {
       toast.error("Failed to initialize provider", TOAST_CONFIG);
-      setError("Please install MetaMask to connect");
     }
   }, []);
 
   // Switch to Open Campus network
   const switchToOpenCampusNetwork = useCallback(async () => {
-    if (!window.ethereum) return false;
+    if (!window.ethereum || !window.ethereum.isMetaMask) {
+      toast.error("Please use MetaMask wallet to connect", TOAST_CONFIG);
+      return false;
+    }
     
     try {
       await window.ethereum.request({
@@ -87,23 +95,33 @@ export const useWallet = () => {
     }
   }, []);
 
-  // Handle wallet connection
+  // Handle wallet connection - MetaMask only
   const connectWallet = useCallback(async (): Promise<void> => {
     setIsConnecting(true);
-    setError(null);
+
+    if (!provider) {
+      toast.error("Provider not initialized", TOAST_CONFIG);
+      setIsConnecting(false);
+      return;
+    }
+    
+    // Verify we're using MetaMask
+    if (!window.ethereum || !window.ethereum.isMetaMask) {
+      toast.error("Please use MetaMask wallet to connect", TOAST_CONFIG);
+      setIsConnecting(false);
+      return;
+    }
+
+    // Ensure correct network
+    const networkSwitched = await switchToOpenCampusNetwork();
+    if (!networkSwitched) {
+      toast.error("Network switch failed", TOAST_CONFIG);
+      setIsConnecting(false);
+      return;
+    }
 
     try {
-      if (!provider) {
-        throw new Error("Provider not initialized");
-      }
-
-      // Ensure correct network
-      const networkSwitched = await switchToOpenCampusNetwork();
-      if (!networkSwitched) {
-        throw new Error("Network switch failed");
-      }
-
-      // Request accounts
+      // Request accounts - direct MetaMask prompt
       await provider.send("eth_requestAccounts", []);
       const newSigner = await provider.getSigner();
       const newAddress = await newSigner.getAddress();
@@ -120,7 +138,6 @@ export const useWallet = () => {
             ? "Please install MetaMask to connect"
             : err.message || "Failed to connect wallet";
       
-      setError(errorMessage);
       toast.error(errorMessage, TOAST_CONFIG);
       
       setSigner(null);
@@ -140,7 +157,7 @@ export const useWallet = () => {
 
   // Check if wallet was previously connected
   const checkConnection = useCallback(async () => {
-    if (!provider) return;
+    if (!provider || !window.ethereum || !window.ethereum.isMetaMask) return;
     
     try {
       const storedAddress = localStorage.getItem("walletAddress");
@@ -164,14 +181,14 @@ export const useWallet = () => {
 
   // Initial connection check
   useEffect(() => {
-    if (provider) {
+    if (provider && window.ethereum && window.ethereum.isMetaMask) {
       checkConnection();
     }
   }, [provider, checkConnection]);
 
   // Handle account and chain changes
   useEffect(() => {
-    if (!window.ethereum) return;
+    if (!window.ethereum || !window.ethereum.isMetaMask) return;
 
     const handleAccountsChanged = async (accounts: string[]) => {
       if (accounts.length === 0) {
@@ -196,7 +213,6 @@ export const useWallet = () => {
         const switched = await switchToOpenCampusNetwork();
         if (!switched) {
           toast.error("Please connect to the Edu Chain network", TOAST_CONFIG);
-          setError("Please connect to the Edu Chain network");
         }
       }
     };
@@ -214,7 +230,6 @@ export const useWallet = () => {
     signer,
     address,
     isConnecting,
-    error,
     provider,
     connectWallet,
     disconnect,
