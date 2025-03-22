@@ -8,8 +8,7 @@ interface OCIDProviderProps {
 }
 
 const opts = {
-  redirectUri: "https://decide-dapp.vercel.app/redirect",
-  referralCode: "PARTNER6",
+  redirectUri: "https://decide-dapp.vercel.app/redirect"
 };
 
 const OCIDProvider: FC<OCIDProviderProps> = ({ children }) => (

@@ -42,6 +42,9 @@ contract Decide {
     error Decide__InvalidEntryId();
     error Decide__ContestNotYetEnded();
     error Decide__NoEntries();
+    error Decide__InvalidStakeAmount();
+    error Decide__StakingFailed();
+    error Decide__NoStakedTokens();
 
     /*//////////////////////////////////////////////////////////////
                         TYPE DECLARATIONS
@@ -63,6 +66,7 @@ contract Decide {
         Entry[] winners;
         uint256[] entryIds;
         ContestState contestState;
+        uint256 stakerRewardPool;
     }
 
     struct Entry {
@@ -80,11 +84,16 @@ contract Decide {
     uint256 private nonce;
     uint256 private s_contestId;
     Contest[] private s_contests;
+    address private immutable i_owner;
+    uint256 private constant MIN_CONTEST_CREATION_STAKE_AMOUNT = 0.05 ether;
+    uint256 private constant MIN_VOTING_STAKE_AMOUNT = 0.005 ether;
     mapping(uint256 => Contest) s_contest;
     mapping(uint256 => bool) public s_contestExists;
-    mapping(uint256 => mapping(bytes32 => bool)) hasVoted;
+    mapping(uint256 => mapping(address => bool)) hasVoted;
     mapping(uint256 => mapping(address => bool)) s_hasJoinedContest;
     mapping(uint256 => mapping(uint256 => Entry)) s_entry;
+    mapping(uint256 => mapping(address => uint256)) public s_stakedAmounts;
+    mapping(uint256 => uint256) public s_totalStakedAmounts; 
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
@@ -94,11 +103,7 @@ contract Decide {
     event ContestStateUpdated(uint256 indexed contestId, ContestState indexed state);
     event WinnersSelected(uint256 indexed contestId, Entry[] winners);
     event PrizeDistributed(uint256 indexed contestId, address indexed winner, uint256 prize, uint256 place);
-
-    /*//////////////////////////////////////////////////////////////
-                                FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-    constructor() {}
+    event StakeWithdrawn(address indexed user, uint256 indexed contestId, uint256 amount, uint256 reward);
 
     /*//////////////////////////////////////////////////////////////
                             EXTERNAL FUNCTIONS
@@ -151,10 +156,18 @@ contract Decide {
         uint256 _entryFee,
         uint256 _entryTime,
         uint256 _voteTime
-    ) public {
+    ) public payable {
+        uint256 stakeAmount = msg.value;
+        if (stakeAmount < MIN_CONTEST_CREATION_STAKE_AMOUNT) {
+            revert Decide__InvalidStakeAmount();
+        }
         // Generate a unique contest ID
         uint256 contestId = uint256(keccak256(abi.encodePacked(block.timestamp, _name, msg.sender, nonce)));
         nonce++;
+
+        // Update staked amounts
+        s_stakedAmounts[contestId][msg.sender] += stakeAmount;
+        s_totalStakedAmounts[contestId] += stakeAmount;
 
         Contest memory newContest = Contest({
             id: contestId,
@@ -166,7 +179,8 @@ contract Decide {
             voteTimeDeadline: block.timestamp + _entryTime + _voteTime,
             winners: new Entry[](0),
             entryIds: new uint256[](0),
-            contestState: ContestState.OPEN
+            contestState: ContestState.OPEN,
+            stakerRewardPool: 0
         });
 
         s_contests.push(newContest);
@@ -235,6 +249,11 @@ contract Decide {
         s_entry[_contestId][newEntryId] = newEntry;
         s_hasJoinedContest[_contestId][msg.sender] = true;
 
+        Entry storage entry = s_entry[_contestId][newEntryId];
+        entry.votes++;
+
+        hasVoted[_contestId][msg.sender] = true;
+
         emit ContestJoined(_contestId, msg.sender, _name);
     }
 
@@ -246,7 +265,6 @@ contract Decide {
      *
      * @param _contestId The ID of the contest in which the vote is being cast.
      * @param _entryId The ID of the entry that is receiving the vote.
-     * @param voter A unique identifier for the voter (e.g., their username).
      *
      * @custom:error Decide__InvalidContestId If the contest ID does not exist.
      * @custom:error Decide__InvalidEntryId If the entry ID does not exist.
@@ -256,7 +274,7 @@ contract Decide {
      *
      * @dev Updates the vote count for the specified entry and marks the voter as having voted.
      */
-    function voteForEntry(uint256 _contestId, uint256 _entryId, string memory voter) public {
+    function voteForEntry(uint256 _contestId, uint256 _entryId) public payable {
         if (!s_contestExists[_contestId]) {
             revert Decide__InvalidContestId();
         }
@@ -273,16 +291,22 @@ contract Decide {
             revert Decide__NotInVotingPhase();
         }
 
-        bytes32 voterHash = keccak256(abi.encodePacked(voter));
-
-        if (hasVoted[_contestId][voterHash] == true) {
+        if (hasVoted[_contestId][msg.sender] == true) {
             revert Decide_UserHasVotedAlready();
         }
+
+        if (msg.value < MIN_VOTING_STAKE_AMOUNT) {
+            revert Decide__InvalidStakeAmount();
+        }
+
+        // Update staked amounts
+        s_stakedAmounts[_contestId][msg.sender] += msg.value;
+        s_totalStakedAmounts[_contestId] += msg.value;
 
         Entry storage entry = s_entry[_contestId][_entryId];
         entry.votes++;
 
-        hasVoted[_contestId][voterHash] = true;
+        hasVoted[_contestId][msg.sender] = true;
     }
 
     /**
@@ -445,34 +469,97 @@ contract Decide {
         emit WinnersSelected(_contestId, contest.winners);
     }
 
+    /**
+     * @notice Allows users to withdraw their staked native tokens and rewards after the contest ends.
+     * @dev Calculates the user's share of the 5% staker reward pool based on their staked amount and the total staked amount.
+     * Transfers the staked tokens and rewards to the user.
+     * The contest must be in the CLOSED state for users to withdraw their stake.
+     *
+     * @param contestId The ID of the contest for which the user is withdrawing their stake.
+     *
+     * @custom:effects Transfers staked tokens and rewards to the user.
+     * @custom:effects Resets the user's staked amount for the contest.
+     * @custom:emits StakeWithdrawn Emitted when a user successfully withdraws their stake and rewards.
+     * @custom:reverts Decide__ContestNotClosed If the contest is not in the CLOSED state.
+     * @custom:reverts Decide__NoStakedTokens If the user has no staked tokens to withdraw.
+     * @custom:reverts Decide__TransferFailed If the transfer of staked tokens and rewards fails.
+     */
+    function withdrawStake(uint256 contestId) public {
+        Contest storage contest = s_contest[contestId];
+        if (contest.contestState != ContestState.CLOSED) {
+            revert Decide__ContestNotYetEnded();
+        }
+
+        uint256 stakedAmount = s_stakedAmounts[contestId][msg.sender];
+        if (stakedAmount == 0) {
+            revert Decide__NoStakedTokens();
+        }
+
+        // Calculate the user's share of the staker reward pool
+        uint256 reward = (stakedAmount * contest.stakerRewardPool) / s_totalStakedAmounts[contestId];
+
+        // Transfer staked tokens and rewards to the user
+        (bool success,) = msg.sender.call{value: stakedAmount + reward}("");
+        if (!success) {
+            revert Decide__TransferFailed();
+        }
+
+        // Reset staked amounts
+        s_stakedAmounts[contestId][msg.sender] = 0;
+        s_totalStakedAmounts[contestId] -= stakedAmount;
+
+        emit StakeWithdrawn(msg.sender, contestId, stakedAmount, reward);
+    }
+
     /*//////////////////////////////////////////////////////////////
                         INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
     /**
-     * @notice Distributes prizes to contest winners.
-     * @dev Transfers Ether prizes to the top 3 winners of a contest using a pre-defined distribution:
-     * - 1st place receives 50% of the total prize pool.
-     * - 2nd place receives 30% of the total prize pool.
-     * - 3rd place receives 20% of the total prize pool.
-     * The function implements secure EDU transfer patterns and includes failure handling.
+     * @notice Distributes prizes to contest winners and saves rewards for stakers.
+     * @dev Deducts a 5% platform fee and saves 5% for stakers from the prize pool.
+     * The remaining 90% is distributed to the top 3 winners (50%, 30%, 20%).
+     * The function implements secure native token transfer patterns and includes failure handling.
      * If a transfer fails, the transaction will revert to ensure no funds are lost.
      *
      * @param _contestId The ID of the contest for which prizes are being distributed.
      *
-     * @custom:security Uses pull-over-push pattern to avoid reentrancy and transfer failures.
+     * @custom:effects Deducts a 5% platform fee and saves 5% for stakers.
+     * @custom:effects Distributes the remaining 90% to the top 3 winners.
      * @custom:emits PrizeDistributed Emitted when a prize is successfully sent to a winner.
-     * @custom:reverts Decide__TransferFailed If a prize transfer fails.
+     * @custom:reverts Decide__TransferFailed If a prize or platform fee transfer fails.
      */
     function _distributePrizes(uint256 _contestId) internal {
         Contest storage contest = s_contest[_contestId];
 
+        // Calculate total prize pool (entry fees from all participants)
         uint256 totalPrize = contest.entryIds.length * contest.entryFee;
+
+        // Deduct platform fee (5% of the prize pool)
+        uint256 platformFee = (totalPrize * 5) / 100;
+
+        // Save 5% for stakers
+        uint256 stakerRewardPool = (totalPrize * 5) / 100;
+
+        // Remaining prize pool for winners (90%)
+        uint256 remainingPrize = totalPrize - platformFee - stakerRewardPool;
+
+        // Distribute prizes to winners (50%, 30%, 20% of the remaining prize pool)
         uint256[3] memory prizes = [
-            (totalPrize * 50) / 100, // First prize
-            (totalPrize * 30) / 100, // Second prize
-            (totalPrize * 20) / 100 // Third prize
+            (remainingPrize * 50) / 100, // First prize
+            (remainingPrize * 30) / 100, // Second prize
+            (remainingPrize * 20) / 100 // Third prize
         ];
 
+        // Transfer platform fee to the platform owner
+        (bool platformFeeSuccess,) = i_owner.call{value: platformFee}("");
+        if (!platformFeeSuccess) {
+            revert Decide__TransferFailed();
+        }
+
+        // Save the staker reward pool in the contest storage
+        contest.stakerRewardPool = stakerRewardPool;
+
+        // Distribute prizes to winners
         for (uint256 i = 0; i < contest.winners.length && i < 3; i++) {
             address winner = contest.winners[i].owner;
             (bool success,) = winner.call{value: prizes[i]}("");
@@ -547,7 +634,8 @@ contract Decide {
                 voteTimeDeadline: contest.voteTimeDeadline,
                 winners: contest.winners,
                 entryIds: contest.entryIds,
-                contestState: contest.contestState
+                contestState: contest.contestState,
+                stakerRewardPool: contest.stakerRewardPool
             });
         }
 
@@ -639,13 +727,57 @@ contract Decide {
      * The voter identifier is hashed to ensure privacy and consistency.
      *
      * @param _contestId The ID of the contest to check.
-     * @param voter A unique identifier for the voter (e.g., their address or username).
      * @return bool True if the voter has voted in the contest, false otherwise.
      *
      * @custom:effects None (read-only function).
      */
-    function getHasUserVoted(uint256 _contestId, string memory voter) public view returns (bool) {
-        bytes32 voterHash = keccak256(abi.encodePacked(voter));
-        return hasVoted[_contestId][voterHash];
+    function getHasUserVoted(uint256 _contestId, address _user) public view returns (bool) {
+        return hasVoted[_contestId][_user];
     }
+
+        /**
+     * @notice Returns the amount a user has staked in a specific contest.
+     * @param _user The address of the user.
+     * @param _contestId The ID of the contest.
+     * @return The amount of EDU tokens staked by the user.
+     */
+    function getUserStakedAmount(address _user, uint256 _contestId) public view returns (uint256) {
+        return s_stakedAmounts[_contestId][_user];
+    }
+
+    /**
+     * @notice Returns the total amount of EDU tokens staked in a contest.
+     * @param _contestId The ID of the contest.
+     * @return The total staked amount for the contest.
+     */
+    function getTotalContestStakedAmount(uint256 _contestId) public view returns (uint256) {
+        return s_totalStakedAmounts[_contestId];
+    }
+
+    /**
+     * @notice Returns the user's staked amount and calculated reward after the contest ends.
+     * @dev The contest must be in the CLOSED state for rewards to be claimed.
+     * @param _contestId The ID of the contest.
+     * @param _user The address of the user.
+     * @return stakedAmount The amount of EDU tokens staked by the user.
+     * @return reward The reward amount calculated from the staker reward pool.
+     * @dev Reverts if the contest is not yet closed or if the user has no staked tokens.
+     */
+    function getUserStakeAndReward(uint256 _contestId, address _user) public view returns (uint256, uint256) {
+        Contest storage contest = s_contest[_contestId];
+        if (contest.contestState != ContestState.CLOSED) {
+            revert Decide__ContestNotYetEnded();
+        }
+
+        uint256 stakedAmount = s_stakedAmounts[_contestId][_user];
+        if (stakedAmount == 0) {
+            revert Decide__NoStakedTokens();
+        }
+
+        // Calculate the user's share of the staker reward pool
+        uint256 reward = (stakedAmount * contest.stakerRewardPool) / s_totalStakedAmounts[_contestId];
+
+        return (stakedAmount, reward);
+    }
+
 }

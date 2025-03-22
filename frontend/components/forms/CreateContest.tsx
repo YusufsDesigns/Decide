@@ -19,11 +19,10 @@ import { Textarea } from "../ui/textarea";
 import { useWallet } from "@/hooks/useWallet";
 import { useContractWrite } from "@/hooks/useContract";
 import abi from "@/abi.json";
-import { parseEther } from "ethers";
+import { formatEther, parseEther } from "ethers";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { useUser } from "@/context/userContext";
+import { useEffect, useState } from "react";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -35,14 +34,25 @@ const formSchema = z.object({
   entryFee: z.string(),
   entryTime: z.string(),
   voteTime: z.string(),
+  stakeAmount: z.string().refine(
+    (value) => {
+      // This will be validated in the component with actual balance checks
+      const amount = parseFloat(value);
+      return !isNaN(amount) && amount > 0;
+    },
+    {
+      message: "Please enter a valid stake amount.",
+    }
+  ),
 });
 
 export function CreateContest() {
-  const { signer } = useWallet();
+  const { signer, academicIdentity } = useWallet();
   const contract = useContractWrite(abi);
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
-  const { username } = useUser();
+  const [walletBalance, setWalletBalance] = useState("0");
+  const [minimumStake, setMinimumStake] = useState("0.05");
 
   // 1. Define your form.
   const form = useForm<z.infer<typeof formSchema>>({
@@ -53,8 +63,32 @@ export function CreateContest() {
       entryFee: "",
       entryTime: "",
       voteTime: "",
+      stakeAmount: "",
     },
   });
+
+  // Fetch wallet balance when signer changes
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (signer) {
+        try {
+          // Get the address from signer
+          const address = await signer.getAddress();
+          // Get the balance
+          if (!signer.provider) throw new Error("Provider not found");
+          const balance = await signer.provider.getBalance(address);
+          // Convert from wei to ETH and format with 4 decimal places
+          const balanceInEth = formatEther(balance);
+          setWalletBalance(balanceInEth);
+        } catch (error) {
+          console.error("Error fetching balance:", error);
+          toast.error("Failed to fetch wallet balance");
+        }
+      }
+    };
+
+    fetchBalance();
+  }, [signer, contract]);
 
   const convertDaysToSeconds = (days: number): number => {
     const secondsInADay = 86400; // 24 hours * 60 minutes * 60 seconds
@@ -80,40 +114,83 @@ export function CreateContest() {
       return;
     }
 
+    // Validate stake amount
+    const stakeAmountFloat = parseFloat(values.stakeAmount);
+    const minStakeFloat = parseFloat(minimumStake); // This is now 0.05
+    const balanceFloat = parseFloat(walletBalance);
+    
+    if (isNaN(stakeAmountFloat) || stakeAmountFloat <= 0) {
+      toast.error("Please enter a valid stake amount.", {
+        position: "top-center",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: false,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "light",
+      });
+      setIsPending(false);
+      return;
+    }
+    
+    if (stakeAmountFloat < minStakeFloat) {
+      toast.error(`Stake amount must be at least ${minimumStake} EDU.`, {
+        position: "top-center",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: false,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "light",
+      });
+      setIsPending(false);
+      return;
+    }
+    
+    if (stakeAmountFloat > balanceFloat) {
+      toast.error("Stake amount exceeds your wallet balance.", {
+        position: "top-center",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: false,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "light",
+      });
+      setIsPending(false);
+      return;
+    }
+
     // Convert days to seconds
     const entryTime = convertDaysToSeconds(entryTimeDaysNumber);
     const voteTime = convertDaysToSeconds(voteTimeDaysNumber);
 
-    // Convert entry fee to wei
-    let entryFeeInWei;
+    // Convert entry fee and stake to wei
+    let entryFeeInWei, stakeAmountInWei;
     try {
       entryFeeInWei = parseEther(values.entryFee); // Convert EDU to wei
+      stakeAmountInWei = parseEther(values.stakeAmount); // Convert EDU to wei
     } catch (error) {
-      alert("Please enter a valid entry fee in EDU.");
+      alert("Please enter valid amounts for entry fee and stake.");
+      setIsPending(false);
       return;
     }
 
     if (signer) {
       try {
-        if (!username) {
-          return toast.error("Connect to your open campus ID", {
-            position: "top-center",
-            autoClose: 5000,
-            hideProgressBar: false,
-            closeOnClick: false,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-            theme: "light",
-          });
-        }
         const tx = await contract.createContest(
           values.name,
-          username,
+          academicIdentity,
           values.description,
           entryFeeInWei,
           entryTime,
-          voteTime
+          voteTime,
+          {
+            value: stakeAmountInWei,
+          }
         );
         await tx.wait();
 
@@ -182,6 +259,37 @@ export function CreateContest() {
               </FormItem>
             )}
           />
+          {/* Add the stake amount field */}
+          <FormField
+            control={form.control}
+            name="stakeAmount"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Stake Amount (EDU)</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Input
+                      placeholder="Min: 0.05 EDU"
+                      className="bg-[#223c49] border-none h-12 pr-24"
+                      {...field}
+                      onChange={(e) => {
+                        // Allow only numbers and decimal point
+                        const value = e.target.value.replace(/[^0-9.]/g, '');
+                        field.onChange(value);
+                      }}
+                    />
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-gray-400">
+                      Balance: {`${parseFloat(walletBalance).toFixed(4)} EDU`}
+                    </div>
+                  </div>
+                </FormControl>
+                <FormDescription>
+                  Minimum stake required: 0.05 EDU. Your current balance: {`${parseFloat(walletBalance).toFixed(4)} EDU`}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
           <FormField
             control={form.control}
             name="description"
@@ -204,7 +312,7 @@ export function CreateContest() {
             name="entryFee"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Entre Fee in (EDU)</FormLabel>
+                <FormLabel>Entry Fee (EDU)</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="3"
@@ -221,7 +329,7 @@ export function CreateContest() {
             name="entryTime"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Entry Time in (days)</FormLabel>
+                <FormLabel>Entry Time (days)</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="10"
@@ -241,7 +349,7 @@ export function CreateContest() {
             name="voteTime"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Vote Time in (days)</FormLabel>
+                <FormLabel>Vote Time (days)</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="30"

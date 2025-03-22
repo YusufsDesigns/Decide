@@ -44,11 +44,10 @@ export function CreateEntry({
   entryFee: string;
   setUrl: React.Dispatch<React.SetStateAction<string | undefined>>;
 }) {
-  const { signer } = useWallet();
+  const { signer, academicIdentity  } = useWallet();
   const contract = useContractWrite(abi);
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
-  const { username } = useUser();
 
   // 1. Define your form.
   const form = useForm<z.infer<typeof formSchema>>({
@@ -69,18 +68,6 @@ export function CreateEntry({
     const ipfsUrl = `https://amaranth-charming-marlin-562.mypinata.cloud/ipfs/${upload.IpfsHash}`;
 
     if (signer) {
-      if (!username) {
-        return toast.error("Connect to your open campus ID", {
-          position: "top-center",
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: false,
-          pauseOnHover: true,
-          draggable: true,
-          progress: undefined,
-          theme: "light",
-        });
-      }
       try {
         // Parse contestId and entryFee
         const id = ethers.getBigInt(contestId);
@@ -89,7 +76,7 @@ export function CreateEntry({
         const tx = await contract.joinContest(
           id,
           values.name.trim(),
-          username,
+          academicIdentity,
           ipfsUrl,
           {
             value: fee,

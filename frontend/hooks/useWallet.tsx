@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { BrowserProvider, Signer } from "ethers";
 import { toast } from "react-toastify";
+import { useRouter } from "next/navigation";
+import { generateEducationalUsername } from "@/lib/utils";
 
 declare global {
   interface Window {
@@ -40,6 +42,8 @@ export const useWallet = () => {
   const [signer, setSigner] = useState<Signer | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [provider, setProvider] = useState<BrowserProvider | null>(null);
+  const [academicIdentity, setAcademicIdentity] = useState<string>("");
+  const router = useRouter();
 
   // Initialize provider - ensure it's MetaMask
   useEffect(() => {
@@ -47,14 +51,14 @@ export const useWallet = () => {
       toast.error("Please install MetaMask to connect", TOAST_CONFIG);
       return;
     }
-    
+
     // Check if the provider is MetaMask
     const isMetaMask = window.ethereum.isMetaMask;
     if (!isMetaMask) {
       toast.error("Please use MetaMask wallet to connect", TOAST_CONFIG);
       return;
     }
-    
+
     try {
       setProvider(new BrowserProvider(window.ethereum));
     } catch (err) {
@@ -68,7 +72,7 @@ export const useWallet = () => {
       toast.error("Please use MetaMask wallet to connect", TOAST_CONFIG);
       return false;
     }
-    
+
     try {
       await window.ethereum.request({
         method: "wallet_switchEthereumChain",
@@ -89,7 +93,10 @@ export const useWallet = () => {
           return false;
         }
       } else {
-        toast.error("Failed to switch to Open Campus Codex network", TOAST_CONFIG);
+        toast.error(
+          "Failed to switch to Open Campus Codex network",
+          TOAST_CONFIG
+        );
         return false;
       }
     }
@@ -104,7 +111,7 @@ export const useWallet = () => {
       setIsConnecting(false);
       return;
     }
-    
+
     // Verify we're using MetaMask
     if (!window.ethereum || !window.ethereum.isMetaMask) {
       toast.error("Please use MetaMask wallet to connect", TOAST_CONFIG);
@@ -130,16 +137,27 @@ export const useWallet = () => {
       localStorage.setItem("walletAddress", newAddress);
       setSigner(newSigner);
       setAddress(newAddress);
+
+      if (newSigner) {
+        try {
+          const username = generateEducationalUsername(newAddress);
+          setAcademicIdentity(username);
+
+        } catch (error) {
+          console.error("Error generating academic identity:", error);
+        }
+      }
+      router.push("/contests");
     } catch (err: any) {
-      const errorMessage = 
-        err.code === 4001 
-          ? "User rejected the connection request" 
+      const errorMessage =
+        err.code === 4001
+          ? "User rejected the connection request"
           : err.message?.includes("MetaMask not detected")
-            ? "Please install MetaMask to connect"
-            : err.message || "Failed to connect wallet";
-      
+          ? "Please install MetaMask to connect"
+          : err.message || "Failed to connect wallet";
+
       toast.error(errorMessage, TOAST_CONFIG);
-      
+
       setSigner(null);
       setAddress(null);
       localStorage.removeItem("walletAddress");
@@ -152,24 +170,36 @@ export const useWallet = () => {
   const disconnect = useCallback(() => {
     setSigner(null);
     setAddress(null);
+    setAcademicIdentity("");
     localStorage.removeItem("walletAddress");
   }, []);
 
   // Check if wallet was previously connected
   const checkConnection = useCallback(async () => {
     if (!provider || !window.ethereum || !window.ethereum.isMetaMask) return;
-    
+
     try {
       const storedAddress = localStorage.getItem("walletAddress");
       if (!storedAddress) return;
 
       const accounts = await provider.listAccounts();
-      if (accounts.length > 0 && 
-          accounts[0].address.toLowerCase() === storedAddress.toLowerCase()) {
+      if (
+        accounts.length > 0 &&
+        accounts[0].address.toLowerCase() === storedAddress.toLowerCase()
+      ) {
         const newSigner = await provider.getSigner();
         const confirmedAddress = await newSigner.getAddress();
         setSigner(newSigner);
         setAddress(confirmedAddress);
+        if (newSigner) {
+          try {
+            const username = generateEducationalUsername(confirmedAddress);
+            setAcademicIdentity(username);
+  
+          } catch (error) {
+            console.error("Error generating academic identity:", error);
+          }
+        }
       } else {
         localStorage.removeItem("walletAddress");
       }
@@ -200,6 +230,15 @@ export const useWallet = () => {
           localStorage.setItem("walletAddress", newAddress);
           setSigner(newSigner);
           setAddress(newAddress);
+          if (newSigner) {
+            try {
+              const username = generateEducationalUsername(newAddress);
+              setAcademicIdentity(username);
+    
+            } catch (error) {
+              console.error("Error generating academic identity:", error);
+            }
+          }
         } catch (err) {
           toast.error("Failed to update signer", TOAST_CONFIG);
           disconnect();
@@ -208,7 +247,7 @@ export const useWallet = () => {
     };
 
     const handleChainChanged = async () => {
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      const chainId = await window.ethereum.request({ method: "eth_chainId" });
       if (chainId !== EDU_CHAIN_ID) {
         const switched = await switchToOpenCampusNetwork();
         if (!switched) {
@@ -229,6 +268,7 @@ export const useWallet = () => {
   return {
     signer,
     address,
+    academicIdentity,
     isConnecting,
     provider,
     connectWallet,
