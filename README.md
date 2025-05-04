@@ -6,12 +6,16 @@ DECIDE is a Web3-powered platform that enables students, educators, and innovato
 Through a **crowdsourced funding model**, participants submit a **small fee to join contests**, forming a prize pool. The community then votes on the **most impactful proposals**, ensuring that the best solutions receive **recognition and funding**.
 
 ## Features
-- **Propose Educational Solutions**: Submit ideas that can improve education.
+- **Create Contests**: Users stake an amount (e.g., **0.05 EDU tokens**) to create a contest, ensuring legitimacy and preventing spam. Contest creators set the **contest name, description, entry fee, entry period, and voting period**.
+- **Join Contests**: Participants pay the **entry fee**, increasing the **total prize pool** and adding their solution to the list of contest entries.
+- **Vote on Entries**: To prevent spam and biased voting, users stake an amount (e.g., **0.005 EDU tokens**) before voting. Votes are final, and users cannot vote multiple times or switch votes without restaking.
 - **Crowdsourced Funding**: Entry fees contribute to the prize pool.
 - **Transparent Voting**: Decentralized voting ensures fair results.
 - **Smart Contracts for Trust**: Ensures secure transactions and fair distribution of rewards.
 - **Web3 Wallet Integration**: Users connect wallets to participate in contests.
 - **Impact Recognition**: Winning proposals gain visibility for potential real-world implementation.
+- **Monetization & Rewards**: **5%** of the total prize pool is rewarded to stakers, **5%** goes to the platform, and **90%** is distributed among the top three winners.
+- **Increases TVL on EduChain**: Staking mechanisms and prize pools increase the **total value locked (TVL)** on EduChain, strengthening its ecosystem.
 
 ## Tech Stack
 ### Frontend
@@ -26,7 +30,6 @@ Through a **crowdsourced funding model**, participants submit a **small fee to j
 
 ### Deployment
 - **EduChain Testnet** – Test and deploy contracts.
-- **IPFS (Optional)** – Decentralized storage for contest submissions.
 
 ## Installation and Setup
 ### Prerequisites
@@ -99,4 +102,6 @@ MIT License. See `LICENSE` file for details.
 
 ## Contact
 For inquiries, open an issue or reach out via X @dev_lawal.
+
+
 

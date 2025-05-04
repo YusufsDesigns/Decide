@@ -185,7 +185,7 @@ const Page = ({ params }: { params: Promise<{ id: string }> }) => {
       } catch (error) {
         console.error("Error polling upkeep:", error);
       }
-    }, 60000); // Poll every 60 seconds
+    }, 10000); // Poll every 60 seconds
 
     return () => clearInterval(interval); // Cleanup interval on unmount
   }, []);
