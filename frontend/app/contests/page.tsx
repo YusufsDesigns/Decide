@@ -35,7 +35,7 @@ const Page = () => {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const contractRead = useContractRead(abi, provider);
-      
+
       if (!provider || !contractRead) {
         throw new Error("Provider or contract not available");
       }
@@ -46,9 +46,12 @@ const Page = () => {
       }
 
       const start = page * BATCH_SIZE;
-      
+
       // Call the getContestsBatch function
-      const contestsData = await contractRead.getContestsBatch(start, BATCH_SIZE);
+      const contestsData = await contractRead.getContestsBatch(
+        start,
+        BATCH_SIZE
+      );
 
       // Check if we've reached the end of available contests
       if (contestsData.length < BATCH_SIZE) {
@@ -68,7 +71,7 @@ const Page = () => {
       });
 
       // Update contests based on page number (replace or append)
-      setContests(prevContests => 
+      setContests((prevContests) =>
         page === 0 ? formattedContests : [...prevContests, ...formattedContests]
       );
     } catch (error: any) {
@@ -113,17 +116,17 @@ const Page = () => {
     );
   }
 
-  const entryPhaseContests = contests.filter(
-    (contest) => contest.contestState === ContestState[0]
-  );
+  const entryPhaseContests = contests
+    .filter((contest) => contest.contestState === ContestState[0])
+    .reverse();
 
-  const votingPhaseContests = contests.filter(
-    (contest) => contest.contestState === ContestState[1]
-  );
+  const votingPhaseContests = contests
+    .filter((contest) => contest.contestState === ContestState[1])
+    .reverse();
 
-  const closedContests = contests.filter(
-    (contest) => contest.contestState === ContestState[2]
-  );
+  const closedContests = contests
+    .filter((contest) => contest.contestState === ContestState[2])
+    .reverse();
 
   return (
     <div className="max-w-[1200px] mx-auto px-5">
@@ -188,7 +191,7 @@ const Page = () => {
           )}
         </TabsContent>
       </Tabs>
-      
+
       {/* Load More Button */}
       {hasMore && (
         <div className="flex justify-center my-6">
