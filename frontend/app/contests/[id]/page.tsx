@@ -1,7 +1,12 @@
 "use client";
 
 import { useContractRead } from "@/hooks/useContract";
-import { calculateTimeLeft, cn, ContestState, formatTimeLeft } from "@/lib/utils";
+import {
+  calculateTimeLeft,
+  cn,
+  ContestState,
+  formatTimeLeft,
+} from "@/lib/utils";
 import { ethers } from "ethers";
 import React, { use, useEffect, useState } from "react";
 import abi from "@/abi.json";
@@ -25,6 +30,7 @@ import { AlertCircle } from "lucide-react";
 import { useWallet } from "@/hooks/useWallet";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
+import { usePolling } from "@/hooks/usePolling";
 
 interface Contest {
   id: string;
@@ -169,31 +175,32 @@ const Page = ({ params }: { params: Promise<{ id: string }> }) => {
     }
   };
 
-  // Polling for upkeep
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const response = await fetch("/api/upkeep", {
-          method: "POST",
-        });
-        const result = await response.json();
+  // Set up polling
+  const { isActive } = usePolling(
+    async () => {
+      const response = await fetch("/api/upkeep", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
-        if (result.success && result.message === "Upkeep performed successfully") {
-          // Re-fetch contest data if upkeep was performed
-          fetchContest();
-        }
-      } catch (error) {
-        console.error("Error polling upkeep:", error);
+      const result = await response.json();
+      if (
+        result.success &&
+        result.message === "Upkeep performed successfully"
+      ) {
+        await fetchContest(); // Refresh contest data if upkeep was performed
       }
-    }, 10000); // Poll every 60 seconds
-
-    return () => clearInterval(interval); // Cleanup interval on unmount
-  }, []);
+    },
+    60000,
+    [contestId]
+  ); // Poll every 60 seconds
 
   // Initial fetch
   useEffect(() => {
     fetchContest();
-  }, [url, contestId]);
+  }, [contestId]);
 
   if (loading) {
     return (
@@ -205,11 +212,23 @@ const Page = ({ params }: { params: Promise<{ id: string }> }) => {
 
   return (
     <div className="max-w-[1200px] mx-auto px-5 my-5">
+      {/* Status indicator */}
+      <div className="text-right mb-2">
+        <span
+          className={`text-xs ${isActive ? "text-green-500" : "text-gray-500"}`}
+        >
+          {isActive ? "Live updates active" : "Updates paused"}
+        </span>
+      </div>
       <div className="grid lg:grid-cols-3 gap-10">
         <div className="lg:col-span-2">
           <div>
-            <span className="text-xs text-gray-400">Created by {contest?.creator}</span>
-            <h1 className="font-semibold text-2xl sm:text-4xl">{contest?.name}</h1>
+            <span className="text-xs text-gray-400">
+              Created by {contest?.creator}
+            </span>
+            <h1 className="font-semibold text-2xl sm:text-4xl">
+              {contest?.name}
+            </h1>
             <p className="max-w-[800px]">{contest?.description}</p>
           </div>
           <div className="mt-7">
